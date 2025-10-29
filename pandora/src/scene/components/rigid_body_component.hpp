@@ -104,6 +104,7 @@ private:
     std::optional<glm::mat4> m_WorldTransform;
     EntityWeakPtr m_pOwner;
     std::unique_ptr<EntityUserData> m_pUserData;
+    CollisionShape::Type m_ShapeType{ CollisionShape::Type::Sphere };
 };
 
 } // namespace WingsOfSteel

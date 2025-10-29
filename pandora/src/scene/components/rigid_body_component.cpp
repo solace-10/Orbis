@@ -27,6 +27,17 @@ void RigidBodyComponent::Deserialize(const ResourceDataStore* pContext, const Js
     m_LinearFactor = Json::DeserializeVec3(pContext, json, "linear_factor");
     m_AngularFactor = Json::DeserializeVec3(pContext, json, "angular_factor");
 
+    // Deserialize shape object
+    auto shapeResult = Json::DeserializeObject(pContext, json, "shape");
+    if (shapeResult.has_value())
+    {
+        const Json::Data& shapeData = shapeResult.value();
+        m_ShapeType = Json::DeserializeEnum<CollisionShape::Type>(pContext, shapeData, "shape_type", CollisionShape::Type::Sphere);
+    }
+    else
+    {
+        m_ShapeType = CollisionShape::Type::Sphere;  // Default if shape object not found
+    }
 
     assert((m_Mass > 0 && m_MotionType == MotionType::Dynamic) || (m_Mass == 0 && m_MotionType == MotionType::Static));
 
