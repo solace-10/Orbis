@@ -11,8 +11,6 @@
 #include <scene/components/transform_component.hpp>
 #include <scene/entity.hpp>
 
-#include "components/sector_camera_component.hpp"
-#include "components/mech_navigation_component.hpp"
 #include "systems/camera_system.hpp"
 
 namespace WingsOfSteel
@@ -54,96 +52,33 @@ void CameraSystem::Update(float delta)
         return;
     }
 
-    if (pCamera->HasComponent<CameraComponent>())
+    if (pCamera->HasComponent<CameraComponent>() && pCamera->HasComponent<OrbitCameraComponent>())
     {
-        if (pCamera->HasComponent<SectorCameraComponent>())
+        OrbitCameraComponent& orbitCameraComponent = pCamera->GetComponent<OrbitCameraComponent>();
+        if (m_IsDragging && m_InputPending)
         {
-            SectorCameraComponent& sectorCameraComponent = pCamera->GetComponent<SectorCameraComponent>();
+            const float sensitivity = 0.15f;
+            orbitCameraComponent.orbitAngle -= glm::radians(m_MouseDelta.x * sensitivity);
+            orbitCameraComponent.pitch += glm::radians(m_MouseDelta.y * sensitivity);
 
-            EntitySharedPtr pAnchorEntity = sectorCameraComponent.anchorEntity.lock();
-            glm::vec3 anchorPosition(0.0f);
-            glm::vec3 cameraWantedTarget(0.0f);
-            glm::vec3 cameraWantedPosition = sectorCameraComponent.position;
-            if (pAnchorEntity && pAnchorEntity->HasComponent<TransformComponent>())
+            if (orbitCameraComponent.pitch < orbitCameraComponent.minimumPitch)
             {
-                const glm::mat4& anchorTransform = pAnchorEntity->GetComponent<TransformComponent>().transform;
-                anchorPosition = glm::vec3(anchorTransform[3]);
-                cameraWantedPosition = sectorCameraComponent.position + anchorPosition;
-                cameraWantedTarget = anchorPosition;
-
-                if (pAnchorEntity->HasComponent<MechNavigationComponent>() && pAnchorEntity->HasComponent<RigidBodyComponent>())
-                {
-                    const MechNavigationComponent& mechNavigationComponent = pAnchorEntity->GetComponent<MechNavigationComponent>();
-                    const RigidBodyComponent& rigidBodyComponent = pAnchorEntity->GetComponent<RigidBodyComponent>();
-
-                    const std::optional<glm::vec3>& mechAim = mechNavigationComponent.GetAim();
-                    if (mechAim.has_value())
-                    {
-                        // Slowly move the camera back when the player is aiming towards the bottom of the screen (towards positive Z).
-                        glm::vec3 mechAimTarget(mechAim.value());
-                        glm::vec3 mechAimDirection = glm::normalize(mechAimTarget - anchorPosition);
-                        const float backOffFactorTarget = glm::max(0.0f, mechAimDirection.z);
-                        DampSpring(sectorCameraComponent.backOffFactor, backOffFactorTarget, sectorCameraComponent.backOffFactorVelocity, 3.0f, delta);
-                        glm::vec3 cameraBackoffOffset(0.0f, 0.0f, 30.0f * sectorCameraComponent.backOffFactor);
-
-                        // Keep the camera target between the mech and where the player is aiming at.
-                        // The aiming point is kept close to the mech to avoid having the camera turn too much,
-                        // as that makes the mech difficult to control.
-                        const float mechAimTargetDistance = glm::length(mechAimTarget - anchorPosition);
-                        const float maxMechAimTargetDistance = 20.0f;
-                        glm::vec3 mechAimTargetRestricted(mechAimTarget);
-                        if (mechAimTargetDistance > maxMechAimTargetDistance)
-                        {
-                            mechAimTargetRestricted = anchorPosition + glm::normalize(mechAimTarget - anchorPosition) * maxMechAimTargetDistance;
-                        }
-
-                        const glm::vec3 wantedAimLocal = mechAimTargetRestricted - anchorPosition;
-                        DampSpring(sectorCameraComponent.aimLocal, wantedAimLocal, sectorCameraComponent.aimLocalVelocity, 2.0f, delta);
-
-                        cameraWantedPosition = anchorPosition + sectorCameraComponent.defaultOffset + cameraBackoffOffset + sectorCameraComponent.aimLocal;
-                        cameraWantedTarget = anchorPosition + sectorCameraComponent.aimLocal;
-                    }
-                    else
-                    {
-                        cameraWantedPosition = anchorPosition + sectorCameraComponent.defaultOffset;
-                    }
-                }
+                orbitCameraComponent.pitch = orbitCameraComponent.minimumPitch;
             }
-
-            DampSpring(sectorCameraComponent.position, cameraWantedPosition, sectorCameraComponent.positionVelocity, 0.5f, delta);
-            sectorCameraComponent.target = cameraWantedTarget;
-
-            CameraComponent& cameraComponent = pCamera->GetComponent<CameraComponent>();
-            cameraComponent.camera.LookAt(sectorCameraComponent.position, sectorCameraComponent.target, glm::vec3(0.0f, 1.0f, 0.0f));
-        }
-        else if (pCamera->HasComponent<OrbitCameraComponent>())
-        {
-            OrbitCameraComponent& orbitCameraComponent = pCamera->GetComponent<OrbitCameraComponent>();
-            if (m_IsDragging && m_InputPending)
+            else if (orbitCameraComponent.pitch > orbitCameraComponent.maximumPitch)
             {
-                const float sensitivity = 0.15f;
-                orbitCameraComponent.orbitAngle -= glm::radians(m_MouseDelta.x * sensitivity);
-                orbitCameraComponent.pitch += glm::radians(m_MouseDelta.y * sensitivity);
-
-                if (orbitCameraComponent.pitch < orbitCameraComponent.minimumPitch)
-                {
-                    orbitCameraComponent.pitch = orbitCameraComponent.minimumPitch;
-                }
-                else if (orbitCameraComponent.pitch > orbitCameraComponent.maximumPitch)
-                {
-                    orbitCameraComponent.pitch = orbitCameraComponent.maximumPitch;
-                }
-                m_InputPending = false;
+                orbitCameraComponent.pitch = orbitCameraComponent.maximumPitch;
             }
-
-            glm::vec3 position(
-                glm::cos(orbitCameraComponent.orbitAngle) * glm::cos(orbitCameraComponent.pitch),
-                glm::sin(orbitCameraComponent.pitch),
-                glm::sin(orbitCameraComponent.orbitAngle) * glm::cos(orbitCameraComponent.pitch));
-
-            CameraComponent& cameraComponent = pCamera->GetComponent<CameraComponent>();
-            cameraComponent.camera.LookAt(orbitCameraComponent.anchorPosition + position * orbitCameraComponent.distance, orbitCameraComponent.anchorPosition, glm::vec3(0.0f, 1.0f, 0.0f));
+            m_InputPending = false;
         }
+
+        glm::vec3 position(
+            glm::cos(orbitCameraComponent.orbitAngle) * glm::cos(orbitCameraComponent.pitch),
+            glm::sin(orbitCameraComponent.pitch),
+            glm::sin(orbitCameraComponent.orbitAngle) * glm::cos(orbitCameraComponent.pitch));
+
+        CameraComponent& cameraComponent = pCamera->GetComponent<CameraComponent>();
+        cameraComponent.camera.LookAt(orbitCameraComponent.anchorPosition + position * orbitCameraComponent.distance, orbitCameraComponent.anchorPosition, glm::vec3(0.0f, 1.0f, 0.0f));
     }
 }
 

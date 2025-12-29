@@ -8,7 +8,6 @@
 #include <scene/scene.hpp>
 #include <scene/systems/physics_simulation_system.hpp>
 
-#include "components/ai_mech_controller_component.hpp"
 #include "components/ammo_fired_by_component.hpp"
 #include "components/ammo_impact_component.hpp"
 #include "components/ammo_movement_component.hpp"
@@ -17,7 +16,6 @@
 #include "components/shield_component.hpp"
 #include "entity_builder/entity_builder.hpp"
 #include "game.hpp"
-#include "sector/encounter.hpp"
 #include "sector/sector.hpp"
 
 namespace WingsOfSteel
@@ -78,14 +76,6 @@ void AmmoSystem::Update(float delta)
 
                             if (!hitEntityStillAlive)
                             {
-                                EntitySharedPtr pKilledBy;
-                                if (pAmmoEntity->HasComponent<AmmoFiredByComponent>())
-                                {
-                                    pKilledBy = pAmmoEntity->GetComponent<AmmoFiredByComponent>().WeaponOwner.lock();
-                                }
-
-                                Game::Get()->GetSector()->GetEntityKilledSignal().Emit(pHitEntity, pKilledBy);
-
                                 Game::Get()->GetSector()->RemoveEntity(pHitEntity);
                             }
                         }
@@ -191,14 +181,6 @@ void AmmoSystem::ApplyHullDamage(EntitySharedPtr pAmmoEntity, EntitySharedPtr pH
 {
     hitEntityStillAlive = true;
 
-    // Don't apply any hull damage if the result of this encounter has already been decided.
-    // This avoids edge cases where the player dies after the victory screen shows up, or wins after their own carrier has been destroyed.
-    Encounter* pEncounter = Game::Get()->GetSector()->GetEncounter();
-    if (pEncounter && pEncounter->GetEncounterResult() != EncounterResult::Undecided)
-    {
-        return;
-    }
-
     if (pAmmoEntity->HasComponent<AmmoImpactComponent>() && pHitEntity->HasComponent<HullComponent>())
     {
         AmmoImpactComponent& ammoImpactComponent = pAmmoEntity->GetComponent<AmmoImpactComponent>();
@@ -207,12 +189,6 @@ void AmmoSystem::ApplyHullDamage(EntitySharedPtr pAmmoEntity, EntitySharedPtr pH
         hullComponent.Health -= ammoImpactComponent.Damage;
         ammoImpactComponent.ArmorPenetration -= hullComponent.Thickness;
         hitEntityStillAlive = (hullComponent.Health > 0.0f);
-
-        // Notify AI that this entity is under fire.
-        if (pHitEntity->HasComponent<AIMechControllerComponent>())
-        {
-            pHitEntity->GetComponent<AIMechControllerComponent>().DefenseContext.underFire = true;
-        }
     }
 }
 

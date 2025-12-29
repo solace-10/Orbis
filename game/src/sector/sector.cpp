@@ -11,33 +11,19 @@
 #include <scene/components/debug_render_component.hpp>
 #include <scene/components/directional_light_component.hpp>
 #include <scene/components/model_component.hpp>
+#include <scene/components/orbit_camera_component.hpp>
 #include <scene/components/rigid_body_component.hpp>
 #include <scene/components/transform_component.hpp>
 #include <scene/systems/model_render_system.hpp>
 #include <scene/systems/physics_simulation_system.hpp>
 
-#include "components/ai_mech_controller_component.hpp"
-#include "components/mech_modules_component.hpp"
-#include "components/player_controller_component.hpp"
-#include "components/sector_camera_component.hpp"
-#include "components/shield_component.hpp"
-#include "components/weapon_component.hpp"
 #include "entity_builder/entity_builder.hpp"
-#include "sector/encounter.hpp"
 #include "sector/sector.hpp"
-#include "systems/ai_mech_controller_system.hpp"
-#include "systems/ai_strategic_system.hpp"
-#include "systems/ai_strikecraft_controller_system.hpp"
 #include "systems/ammo_system.hpp"
 #include "systems/camera_system.hpp"
-#include "systems/carrier_system.hpp"
 #include "systems/debug_render_system.hpp"
-#include "systems/mech_navigation_system.hpp"
-#include "systems/player_controller_system.hpp"
 #include "systems/shield_system.hpp"
 #include "systems/ship_navigation_system.hpp"
-#include "systems/target_overlay_system.hpp"
-#include "systems/threat_indicator_system.hpp"
 #include "systems/weapon_system.hpp"
 
 namespace WingsOfSteel
@@ -57,17 +43,9 @@ void Sector::Initialize()
 
     AddSystem<ModelRenderSystem>();
     AddSystem<PhysicsSimulationSystem>();
-    AddSystem<AIStrategicSystem>();
-    AddSystem<AIMechControllerSystem>();
-    AddSystem<AIStrikecraftControllerSystem>();
-    AddSystem<CarrierSystem>();
-    AddSystem<PlayerControllerSystem>();
-    AddSystem<MechNavigationSystem>();
     AddSystem<ShipNavigationSystem>();
     AddSystem<WeaponSystem>();
     AddSystem<AmmoSystem>();
-    AddSystem<TargetOverlaySystem>();
-    AddSystem<ThreatIndicatorSystem>();
     AddSystem<ShieldSystem>();
 
     // Make sure these systems are added after everything else that might modify transforms,
@@ -78,32 +56,26 @@ void Sector::Initialize()
     m_pCamera = CreateEntity();
     m_pCamera->AddComponent<CameraComponent>(70.0f, 1.0f, 5000.0f);
 
-    SectorCameraComponent& sectorCameraComponent = m_pCamera->AddComponent<SectorCameraComponent>();
-    sectorCameraComponent.position = glm::vec3(0.0f, 45.0f, 30.0f);
-    sectorCameraComponent.target = glm::vec3(0.0f, 0.0f, 0.0f);
-    sectorCameraComponent.maximumDrift = glm::vec3(0.0f, 0.0f, 0.0f);
+    OrbitCameraComponent& orbitCameraComponent = m_pCamera->AddComponent<OrbitCameraComponent>();
+    orbitCameraComponent.anchorPosition = glm::vec3(0.0f);
+    orbitCameraComponent.distance = 100.0f;
+    orbitCameraComponent.maximumDistance = 500.0f;
+    orbitCameraComponent.pitch = 0.5f;
     SetCamera(m_pCamera);
 
     SpawnDome();
     SpawnLight();
     SpawnPlayerFleet();
-
-    m_pEncounter = std::make_unique<Encounter>();
-    m_pEncounter->Initialize(std::static_pointer_cast<Sector>(shared_from_this()));
 }
 
 void Sector::Update(float delta)
 {
     Scene::Update(delta);
 
-    m_pEncounter->Update(delta);
-
     if (m_ShowGrid)
     {
         GetDebugRender()->XZSquareGrid(-1000.0f, 1000.0f, -1.0f, 100.0f, Color::White);
     }
-
-    DrawCameraDebugUI();
 }
 
 void Sector::ShowCameraDebugUI(bool state)
@@ -116,41 +88,9 @@ void Sector::ShowGrid(bool state)
     m_ShowGrid = state;
 }
 
-void Sector::DrawCameraDebugUI()
-{
-    if (!m_ShowCameraDebugUI)
-    {
-        return;
-    }
-
-    ImGui::Begin("Camera", &m_ShowCameraDebugUI);
-
-    SectorCameraComponent& sectorCameraComponent = m_pCamera->GetComponent<SectorCameraComponent>();
-
-    ImGui::Checkbox("Debug Draw", &sectorCameraComponent.debugDraw);
-
-    const glm::vec3& position = sectorCameraComponent.position;
-    float fposition[3] = { position.x, position.y, position.z };
-    if (ImGui::InputFloat3("Eye", fposition))
-    {
-        sectorCameraComponent.position = glm::vec3(fposition[0], fposition[1], fposition[2]);
-    }
-
-    const glm::vec3& drift = sectorCameraComponent.maximumDrift;
-    float fdrift[3] = { drift.x, drift.y, drift.z };
-    if (ImGui::InputFloat3("Drift", fdrift))
-    {
-        sectorCameraComponent.maximumDrift = glm::vec3(fdrift[0], fdrift[1], fdrift[2]);
-    }
-
-    ImGui::End();
-}
-
 void Sector::SpawnDome()
 {
     m_pDome = CreateEntity();
-
-    SectorCameraComponent& sectorCameraComponent = m_pCamera->GetComponent<SectorCameraComponent>();
 
     TransformComponent& transformComponent = m_pDome->AddComponent<TransformComponent>();
     transformComponent.transform = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -169,93 +109,18 @@ void Sector::SpawnLight()
     directionalLightComponent.SetColor(1.0f, 0.96f, 0.68f);
 
     AmbientLightComponent& ambientLightComponent = m_pLight->AddComponent<AmbientLightComponent>();
-    ambientLightComponent.SetColor(0.10f, 0.14f, 0.17f);    
+    ambientLightComponent.SetColor(0.10f, 0.14f, 0.17f);
 }
 
 void Sector::SpawnPlayerFleet()
 {
     SceneWeakPtr pWeakScene = weak_from_this();
 
-    SpawnMech(glm::vec3(-200.0f, 0.0f, 0.0f), 90.0f, true, WingRole::Offense);
-    SpawnMech(glm::vec3(-200.0f, 0.0f, 30.0f), 90.0f, false, WingRole::Defense);
-    SpawnMech(glm::vec3(-200.0f, 0.0f, -30.0f), 90.0f, false, WingRole::Interception);
-
-    EntityBuilder::Build(pWeakScene, "/entity_prefabs/player/carrier.json", glm::translate(glm::mat4(1.0f), glm::vec3(-250.0f, 0.0f, 0.0f)), [pWeakScene](EntitySharedPtr pEntity) {
+    EntityBuilder::Build(pWeakScene, "/entity_prefabs/player/carrier.json", glm::mat4(1.0f), [pWeakScene](EntitySharedPtr pEntity) {
         SectorSharedPtr pScene = std::dynamic_pointer_cast<Sector>(pWeakScene.lock());
         if (pScene)
         {
             pScene->m_pCarrier = pEntity;
-        }
-    });
-}
-
-void Sector::SpawnMech(const glm::vec3& position, float angle, bool isPlayerMech, WingRole role)
-{
-    glm::mat4 transform = glm::translate(glm::mat4(1.0f), position);
-    transform = glm::rotate(transform, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
-
-    SceneWeakPtr pWeakScene = weak_from_this();
-    EntityBuilder::Build(pWeakScene, "/entity_prefabs/player/mech.json", transform, [pWeakScene, isPlayerMech, role](EntitySharedPtr pMechEntity) {
-        SectorSharedPtr pScene = std::dynamic_pointer_cast<Sector>(pWeakScene.lock());
-        if (pScene)
-        {
-            WingComponent& wingComponent = pMechEntity->AddComponent<WingComponent>();
-            wingComponent.Role = role;
-            
-            if (isPlayerMech)
-            {
-                pScene->m_pPlayerMech = pMechEntity;
-                pMechEntity->AddComponent<PlayerControllerComponent>();
-                pScene->m_pCamera->GetComponent<SectorCameraComponent>().anchorEntity = pMechEntity;
-            }
-            else
-            {
-                AIMechControllerComponent& mechControllerComponent = pMechEntity->AddComponent<AIMechControllerComponent>();
-                mechControllerComponent.OffenseContext.pOwner = pMechEntity;
-                mechControllerComponent.NavigationContext.pOwner = pMechEntity;
-                mechControllerComponent.DefenseContext.pOwner = pMechEntity;
-            }
-
-            const WeaponFriendOrFoe friendOrFoe = isPlayerMech ? WeaponFriendOrFoe::Disabled : WeaponFriendOrFoe::Enabled;
-            pScene->GetSystem<WeaponSystem>()->AttachWeapon(
-                "/entity_prefabs/weapons/mech/shield_r.json",
-                pMechEntity,
-                "RightArm",
-                false,
-                friendOrFoe);
-
-            pScene->GetSystem<WeaponSystem>()->AttachWeapon(
-                "/entity_prefabs/weapons/mech/rotary_cannon_l.json",
-                pMechEntity,
-                "LeftArm",
-                false,
-                friendOrFoe);
-
-            SceneWeakPtr pLocalWeakScene = pScene->GetWeakPtr();
-            EntityBuilder::Build(pLocalWeakScene, "/entity_prefabs/player/mech_energy_shield.json", glm::mat4(1.0f), [pLocalWeakScene, pMechEntity](EntitySharedPtr pShieldEntity) {
-                SectorSharedPtr pScene = std::dynamic_pointer_cast<Sector>(pLocalWeakScene.lock());
-                if (!pScene)
-                {
-                    return;
-                }
-
-                if (!pShieldEntity->HasComponent<ShieldComponent>())
-                {
-                    Log::Error() << "Mech's shield has no ShieldComponent.";
-                    return;
-                }
-
-                pShieldEntity->SetParent(pMechEntity);
-                pShieldEntity->GetComponent<ShieldComponent>().SetOwner(pShieldEntity);
-                
-                if (!pMechEntity->HasComponent<MechModulesComponent>())
-                {
-                    Log::Error() << "Mech has no MechModulesComponent.";
-                    return;
-                }
-
-                pMechEntity->GetComponent<MechModulesComponent>().EnergyShield = pShieldEntity;
-            });
         }
     });
 }
