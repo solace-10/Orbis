@@ -92,9 +92,7 @@ void Sector::ShowGrid(bool state)
 void Sector::SpawnDome()
 {
     m_pDome = CreateEntity();
-
-    TransformComponent& transformComponent = m_pDome->AddComponent<TransformComponent>();
-    transformComponent.transform = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    m_pDome->AddComponent<TransformComponent>();
 
     ModelComponent& modelComponent = m_pDome->AddComponent<ModelComponent>();
     modelComponent.SetModel("/models/dome/dome.glb");

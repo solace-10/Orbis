@@ -86,8 +86,9 @@ void CameraSystem::Update(float delta)
     {
         ScenicCameraComponent& scenicCamera = pCamera->GetComponent<ScenicCameraComponent>();
 
-        // Advance orbit angle (continuous rotation)
+        // Advance orbit phase and calculate orbit angle (smooth bounce until we fix the dome's discontinuity)
         scenicCamera.orbitAngle += scenicCamera.orbitSpeed * delta;
+        float actualOrbitAngle = glm::sin(scenicCamera.orbitAngle) * glm::half_pi<float>() * 0.9f + glm::pi<float>();
 
         // Advance zoom phase and calculate current distance
         scenicCamera.zoomPhase += scenicCamera.zoomSpeed * delta;
@@ -99,9 +100,9 @@ void CameraSystem::Update(float delta)
 
         // Calculate camera position using spherical coordinates
         glm::vec3 position(
-            glm::cos(scenicCamera.orbitAngle) * glm::cos(currentPitch),
+            glm::cos(actualOrbitAngle) * glm::cos(currentPitch),
             glm::sin(currentPitch),
-            glm::sin(scenicCamera.orbitAngle) * glm::cos(currentPitch));
+            glm::sin(actualOrbitAngle) * glm::cos(currentPitch));
 
         CameraComponent& cameraComponent = pCamera->GetComponent<CameraComponent>();
         cameraComponent.camera.LookAt(scenicCamera.anchorPosition + position * currentDistance, scenicCamera.anchorPosition, glm::vec3(0.0f, 1.0f, 0.0f));
