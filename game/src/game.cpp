@@ -40,7 +40,9 @@ void Game::Initialize()
     pRenderSystem->AddRenderPass(std::make_shared<BaseRenderPass>());
     pRenderSystem->AddRenderPass(std::make_shared<UIRenderPass>());
 
+#if defined(BUILD_DEBUG)
     GetImGuiSystem()->SetGameMenuBarCallback([this]() { DrawImGuiMenuBar(); });
+#endif
 
     m_pSector = std::make_shared<Sector>();
     m_pSector->Initialize();
@@ -59,6 +61,7 @@ void Game::Shutdown()
 // Called from ImGuiSystem::Update() to draw any menus in the menu bar.
 void Game::DrawImGuiMenuBar()
 {
+#if defined(BUILD_DEBUG)
     using namespace WingsOfSteel;
 
     if (m_pSector)
@@ -138,6 +141,7 @@ void Game::DrawImGuiMenuBar()
             ImGui::EndMenu();
         }
     }
+#endif // BUILD_DEBUG
 }
 
 } // namespace WingsOfSteel
