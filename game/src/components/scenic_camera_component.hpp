@@ -17,8 +17,8 @@ public:
     void Deserialize(const ResourceDataStore* pContext, const Json::Data& json) override {}
 
     // Base camera parameters
-    glm::vec3 anchorPosition{ -10.0f };   // What the camera looks at (origin)
-    float baseDistance{ 90.0f };        // Base distance from anchor
+    glm::vec3 anchorPosition{ 0.0f };    // What the camera looks at (origin)
+    float baseDistance{ 100.0f };        // Base distance from anchor
     float basePitch{ 0.3f };             // Base vertical angle (radians)
 
     // Orbit animation

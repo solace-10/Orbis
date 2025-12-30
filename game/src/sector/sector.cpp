@@ -57,10 +57,11 @@ void Sector::Initialize()
     m_pCamera->AddComponent<CameraComponent>(70.0f, 1.0f, 5000.0f);
 
     ScenicCameraComponent& scenicCamera = m_pCamera->AddComponent<ScenicCameraComponent>();
-    scenicCamera.anchorPosition = glm::vec3(0.0f);
-    scenicCamera.baseDistance = 100.0f;
+    scenicCamera.anchorPosition = glm::vec3(0.0f, -10.0f, 0.0f);
+    scenicCamera.baseDistance = 90.0f;
     scenicCamera.basePitch = 0.4f;
     scenicCamera.orbitSpeed = 0.03f;
+    scenicCamera.zoomAmplitude = 10.0f;
     SetCamera(m_pCamera);
 
     SpawnDome();
