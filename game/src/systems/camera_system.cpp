@@ -7,6 +7,8 @@
 #include <render/window.hpp>
 #include <scene/components/camera_component.hpp>
 #include <scene/components/orbit_camera_component.hpp>
+
+#include "components/scenic_camera_component.hpp"
 #include <scene/components/rigid_body_component.hpp>
 #include <scene/components/transform_component.hpp>
 #include <scene/entity.hpp>
@@ -79,6 +81,30 @@ void CameraSystem::Update(float delta)
 
         CameraComponent& cameraComponent = pCamera->GetComponent<CameraComponent>();
         cameraComponent.camera.LookAt(orbitCameraComponent.anchorPosition + position * orbitCameraComponent.distance, orbitCameraComponent.anchorPosition, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    else if (pCamera->HasComponent<CameraComponent>() && pCamera->HasComponent<ScenicCameraComponent>())
+    {
+        ScenicCameraComponent& scenicCamera = pCamera->GetComponent<ScenicCameraComponent>();
+
+        // Advance orbit angle (continuous rotation)
+        scenicCamera.orbitAngle += scenicCamera.orbitSpeed * delta;
+
+        // Advance zoom phase and calculate current distance
+        scenicCamera.zoomPhase += scenicCamera.zoomSpeed * delta;
+        float currentDistance = scenicCamera.baseDistance + glm::sin(scenicCamera.zoomPhase) * scenicCamera.zoomAmplitude;
+
+        // Advance pitch phase and calculate current pitch
+        scenicCamera.pitchPhase += scenicCamera.pitchSpeed * delta;
+        float currentPitch = scenicCamera.basePitch + glm::sin(scenicCamera.pitchPhase) * scenicCamera.pitchAmplitude;
+
+        // Calculate camera position using spherical coordinates
+        glm::vec3 position(
+            glm::cos(scenicCamera.orbitAngle) * glm::cos(currentPitch),
+            glm::sin(currentPitch),
+            glm::sin(scenicCamera.orbitAngle) * glm::cos(currentPitch));
+
+        CameraComponent& cameraComponent = pCamera->GetComponent<CameraComponent>();
+        cameraComponent.camera.LookAt(scenicCamera.anchorPosition + position * currentDistance, scenicCamera.anchorPosition, glm::vec3(0.0f, 1.0f, 0.0f));
     }
 }
 

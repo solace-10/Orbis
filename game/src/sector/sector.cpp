@@ -11,12 +11,12 @@
 #include <scene/components/debug_render_component.hpp>
 #include <scene/components/directional_light_component.hpp>
 #include <scene/components/model_component.hpp>
-#include <scene/components/orbit_camera_component.hpp>
 #include <scene/components/rigid_body_component.hpp>
 #include <scene/components/transform_component.hpp>
 #include <scene/systems/model_render_system.hpp>
 #include <scene/systems/physics_simulation_system.hpp>
 
+#include "components/scenic_camera_component.hpp"
 #include "entity_builder/entity_builder.hpp"
 #include "sector/sector.hpp"
 #include "systems/ammo_system.hpp"
@@ -56,11 +56,11 @@ void Sector::Initialize()
     m_pCamera = CreateEntity();
     m_pCamera->AddComponent<CameraComponent>(70.0f, 1.0f, 5000.0f);
 
-    OrbitCameraComponent& orbitCameraComponent = m_pCamera->AddComponent<OrbitCameraComponent>();
-    orbitCameraComponent.anchorPosition = glm::vec3(0.0f);
-    orbitCameraComponent.distance = 100.0f;
-    orbitCameraComponent.maximumDistance = 500.0f;
-    orbitCameraComponent.pitch = 0.5f;
+    ScenicCameraComponent& scenicCamera = m_pCamera->AddComponent<ScenicCameraComponent>();
+    scenicCamera.anchorPosition = glm::vec3(0.0f);
+    scenicCamera.baseDistance = 100.0f;
+    scenicCamera.basePitch = 0.4f;
+    scenicCamera.orbitSpeed = 0.03f;
     SetCamera(m_pCamera);
 
     SpawnDome();
